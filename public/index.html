@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>გამოცდის ტრეკერი</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --red: #e63c3c; --red-dark: #c0392b;
+      --dark: #0d0d0d; --card: #161616; --card2: #1e1e1e;
+      --border: #2a2a2a; --text: #f0f0f0; --muted: #888;
+      --green: #00cc66; --yellow: #f5c842; --blue: #3b82f6;
+    }
+    body { background: var(--dark); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; }
+
+    /* Pages */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* Auth */
+    .auth-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: radial-gradient(ellipse at top, #1a0808 0%, var(--dark) 60%); }
+    .auth-box { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 40px; width: 100%; max-width: 420px; }
+    .auth-logo { text-align: center; margin-bottom: 32px; }
+    .auth-logo .icon { font-size: 48px; display: block; margin-bottom: 12px; }
+    .auth-logo h1 { font-size: 22px; font-weight: 700; }
+    .auth-logo p { color: var(--muted); font-size: 13px; margin-top: 4px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: #ccc; }
+    .form-group input { width: 100%; background: var(--card2); border: 1px solid var(--border); color: var(--text); padding: 12px 14px; border-radius: 10px; font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.2s; }
+    .form-group input:focus { border-color: var(--red); }
+    .btn { width: 100%; background: var(--red); color: white; border: none; padding: 13px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.2s, opacity 0.2s; }
+    .btn:hover { background: var(--red-dark); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: var(--border); }
+    .btn-green { background: var(--green); color: #000; }
+    .btn-green:hover { background: #00aa55; }
+    .btn-blue { background: var(--blue); }
+    .btn-blue:hover { background: #2563eb; }
+    .btn-sm { padding: 7px 14px; font-size: 12px; border-radius: 8px; width: auto; }
+    .auth-switch { text-align: center; margin-top: 20px; font-size: 13px; color: var(--muted); }
+    .auth-switch a { color: var(--red); text-decoration: none; font-weight: 600; cursor: pointer; }
+    .error-msg { background: rgba(230,60,60,0.1); border: 1px solid rgba(230,60,60,0.3); color: #ff8080; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+    .success-msg { background: rgba(0,204,102,0.1); border: 1px solid rgba(0,204,102,0.3); color: var(--green); padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+
+    /* App header */
+    #app-page header { background: var(--card); border-bottom: 2px solid var(--red); padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo-icon { width: 40px; height: 40px; background: var(--red); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+    header h1 { font-size: 16px; font-weight: 700; }
+    header p { font-size: 12px; color: var(--muted); }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .user-badge { font-size: 12px; color: var(--muted); }
+
+    /* Status bar */
+    .status-bar { background: #111; border-bottom: 1px solid var(--border); padding: 8px 28px; display: flex; align-items: center; gap: 20px; font-size: 12px; flex-wrap: wrap; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 5px; }
+    .status-dot.active { background: var(--green); animation: pulse 1.5s infinite; }
+    .status-dot.error { background: var(--red); }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 4px; padding: 20px 28px 0; border-bottom: 1px solid var(--border); }
+    .tab { padding: 10px 20px; border-radius: 10px 10px 0 0; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--muted); border: 1px solid transparent; border-bottom: none; background: transparent; }
+    .tab.active { color: var(--text); background: var(--card); border-color: var(--border); border-bottom-color: var(--card); margin-bottom: -1px; }
+    .tab-content { display: none; padding: 28px; }
+    .tab-content.active { display: block; }
+
+    /* Tracker */
+    .controls { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; }
+    select { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; flex: 1; min-width: 180px; }
+    .btn-track { background: var(--red); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; width: auto; transition: background 0.2s; font-family: inherit; }
+    .btn-track:hover { background: var(--red-dark); }
+    .btn-track:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-stop-track { background: #333; }
+    .btn-stop-track:hover { background: #444; }
+    .alert-banner { background: linear-gradient(135deg,#003300,#001a00); border: 2px solid var(--green); border-radius: 12px; padding: 18px 22px; margin-bottom: 20px; display: none; }
+    .alert-banner.show { display: block; animation: slideIn .3s ease; }
+    @keyframes slideIn { from{transform:translateY(-8px);opacity:0}to{transform:translateY(0);opacity:1} }
+    .alert-banner h2 { color: var(--green); font-size: 16px; margin-bottom: 4px; }
+    .centers-grid { display: grid; gap: 14px; }
+    .center-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; transition: border-color .3s; }
+    .center-card.has-slots { border-color: var(--green); box-shadow: 0 0 16px rgba(0,204,102,.1); }
+    .center-header { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; }
+    .center-name { font-weight: 600; font-size: 14px; }
+    .slot-count { font-size: 11px; padding: 3px 10px; border-radius: 20px; background: var(--border); color: var(--muted); }
+    .slot-count.available { background: rgba(0,204,102,.15); color: var(--green); }
+    .slot-count.empty { background: rgba(204,0,0,.1); color: #ff6666; }
+    .dates-list { padding: 0 18px 14px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .date-tag { background: rgba(0,204,102,.1); border: 1px solid rgba(0,204,102,.3); color: var(--green); padding: 5px 12px; border-radius: 20px; font-size: 12px; }
+    .empty-msg { color: var(--muted); font-size: 12px; font-style: italic; }
+    .loading { text-align: center; padding: 60px; color: var(--muted); }
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--red); border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 14px; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .history-items { display: grid; gap: 8px; margin-top: 16px; }
+    .history-item { font-size: 12px; color: var(--muted); padding: 8px 14px; background: var(--card); border-radius: 8px; border: 1px solid var(--border); }
+    .history-item.found { color: var(--green); border-color: rgba(0,204,102,.2); }
+
+    /* Account */
+    .account-grid { display: grid; gap: 20px; max-width: 600px; }
+    .info-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 22px; }
+    .info-card h3 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 16px; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row span:first-child { color: var(--muted); }
+    .info-row .value { font-weight: 500; }
+    .badge-active { color: var(--green); font-weight: 600; }
+    .badge-inactive { color: #ff6666; font-weight: 600; }
+    .sub-price-box { background: linear-gradient(135deg,#1a0808,#0d0d0d); border: 1px solid rgba(230,60,60,.3); border-radius: 14px; padding: 22px; text-align: center; }
+    .sub-price { font-size: 42px; font-weight: 700; color: var(--red); line-height: 1; }
+    .sub-price span { font-size: 18px; color: var(--muted); }
+    .sub-features { margin: 16px 0; text-align: left; }
+    .sub-feature { font-size: 13px; padding: 6px 0; color: #ccc; }
+    .sub-feature::before { content: '✓ '; color: var(--green); }
+
+    /* Telegram */
+    .tg-steps { display: grid; gap: 16px; max-width: 520px; }
+    .tg-step { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; display: flex; gap: 16px; align-items: flex-start; }
+    .step-num { width: 32px; height: 32px; background: var(--red); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+    .step-num.done { background: var(--green); color: #000; }
+    .tg-step h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .tg-step p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .tg-code-box { background: var(--card2); border: 1px dashed var(--border); border-radius: 10px; padding: 16px; margin-top: 12px; text-align: center; font-family: monospace; letter-spacing: 2px; font-size: 16px; color: var(--yellow); }
+    .deep-link-btn { display: inline-flex; align-items: center; gap: 8px; background: #2196F3; color: white; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; margin-top: 12px; }
+    .notif-toggle { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .toggle { width: 44px; height: 24px; background: var(--border); border-radius: 12px; position: relative; cursor: pointer; transition: background .2s; }
+    .toggle.on { background: var(--green); }
+    .toggle::after { content:''; width:18px; height:18px; background:white; border-radius:50%; position:absolute; top:3px; left:3px; transition:left .2s; }
+    .toggle.on::after { left: 23px; }
+
+    /* Payment modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.8); z-index: 1000; align-items: center; justify-content: center; padding: 24px; }
+    .modal-overlay.show { display: flex; }
+    .modal { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 32px; width: 100%; max-width: 440px; }
+    .modal h2 { font-size: 20px; margin-bottom: 8px; }
+    .modal > p { color: var(--muted); font-size: 13px; margin-bottom: 20px; line-height: 1.5; }
+    .manual-pay-box { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin: 16px 0; font-size: 13px; line-height: 2; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-actions .btn { margin: 0; flex: 1; }
+
+    @media(max-width:600px){.tabs{padding:16px 16px 0;overflow-x:auto}.tab-content{padding:20px 16px}#app-page header{padding:12px 16px}.status-bar{padding:8px 16px}}
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="page active" id="login-page">
+  <div class="auth-wrap">
+    <div class="auth-box">
+      <div class="auth-logo">
+        <span class="icon">🚗</span>
+        <h1>გამოცდის ტრეკერი</h1>
+        <p>პრაქტიკული გამოცდის ადგილების მაძიებელი</p>
+      </div>
+      <div class="error-msg" id="login-error"></div>
+      <div class="form-group">
+        <label>პირადი ნომერი</label>
+        <input type="text" id="login-pid" placeholder="11-ნიშნა პირადი ნომერი" maxlength="11" inputmode="numeric"/>
+      </div>
+      <div class="form-group">
+        <label>პაროლი</label>
+        <input type="password" id="login-pass" placeholder="შეიყვანეთ პაროლი"/>
+      </div>
+      <button class="btn" onclick="doLogin()" id="login-btn">შესვლა</button>
+      <div class="auth-switch">ანგარიში არ გაქვს? <a onclick="showPage('register-page')">დარეგისტრირდი</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- REGISTER -->
+<div class="page" id="register-page">
+  <div class="auth-wrap">
+    <div class="auth-box">
+      <div class="auth-logo">
+        <span class="icon">👤</span>
+        <h1>რეგისტრაცია</h1>
+        <p>შექმენი ანგარიში და დაიწყე ტრეკინგი</p>
+      </div>
+      <div class="error-msg" id="reg-error"></div>
+      <div class="form-group">
+        <label>პირადი ნომერი *</label>
+        <input type="text" id="reg-pid" placeholder="11-ნიშნა პირადი ნომერი" maxlength="11" inputmode="numeric"/>
+      </div>
+      <div class="form-group">
+        <label>სახელი და გვარი *</label>
+        <input type="text" id="reg-name" placeholder="მაგ. გიორგი კვარაცხელია"/>
+      </div>
+      <div class="form-group">
+        <label>ტელეფონი</label>
+        <input type="tel" id="reg-phone" placeholder="+995 5XX XXX XXX"/>
+      </div>
+      <div class="form-group">
+        <label>პაროლი *</label>
+        <input type="password" id="reg-pass" placeholder="მინიმუმ 6 სიმბოლო"/>
+      </div>
+      <div class="form-group">
+        <label>გაიმეორე პაროლი *</label>
+        <input type="password" id="reg-pass2" placeholder="კიდევ ერთხელ"/>
+      </div>
+      <button class="btn" onclick="doRegister()" id="reg-btn">რეგისტრაცია</button>
+      <div class="auth-switch">უკვე გაქვს ანგარიში? <a onclick="showPage('login-page')">შესვლა</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="page" id="app-page">
+  <header>
+    <div class="header-left">
+      <div class="logo-icon">🚗</div>
+      <div>
+        <h1>გამოცდის ტრეკერი</h1>
+        <p id="header-user">იტვირთება...</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="user-badge" id="sub-badge"></span>
+      <button class="btn btn-outline btn-sm" onclick="doLogout()">გამოსვლა</button>
+    </div>
+  </header>
+
+  <div class="status-bar">
+    <div><span class="status-dot" id="statusDot"></span><span id="statusText">გათიშულია</span></div>
+    <div id="lastCheck" style="color:var(--muted)"></div>
+    <div id="countdown" style="color:var(--yellow);font-weight:600"></div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tab-btn-tracker" onclick="switchTab('tracker',this)">🔍 ტრეკერი</div>
+    <div class="tab" id="tab-btn-telegram" onclick="switchTab('telegram',this)">📱 Telegram</div>
+    <div class="tab" id="tab-btn-account" onclick="switchTab('account',this)">👤 ანგარიში</div>
+  </div>
+
+  <!-- TRACKER TAB -->
+  <div class="tab-content active" id="tab-tracker">
+    <div id="sub-required" style="display:none;max-width:500px;margin:0 auto;text-align:center;padding:40px 0">
+      <div style="font-size:56px;margin-bottom:16px">🔒</div>
+      <h2 style="margin-bottom:8px;font-size:20px">გამოწერა საჭიროა</h2>
+      <p style="color:var(--muted);margin-bottom:24px;font-size:14px;line-height:1.6">
+        გამოცდის ადგილების ტრეკინგისთვის საჭიროა<br>
+        <strong style="color:var(--text)">10 ლარის</strong> ყოველთვიური გამოწერა
+      </p>
+      <button class="btn" style="max-width:260px;margin:0 auto" onclick="showPaymentModal()">💳 გამოიწერე — 10 ₾</button>
+    </div>
+
+    <div id="tracker-ui" style="display:none">
+      <div class="controls">
+        <select id="categorySelect">
+          <option value="4">B კატეგორია — ავტომატი</option>
+          <option value="1">B კატეგორია — მექანიკა</option>
+          <option value="3">C კატეგორია</option>
+          <option value="6">D კატეგორია</option>
+          <option value="7">A კატეგორია</option>
+        </select>
+        <button class="btn-track" id="startBtn" onclick="startTracking()">▶ დაწყება</button>
+        <button class="btn-track btn-stop-track" id="stopBtn" onclick="stopTracking()" disabled>⏹ გაჩერება</button>
+      </div>
+      <div class="alert-banner" id="alertBanner">
+        <h2>✅ ადგილი გამოჩნდა!</h2>
+        <p id="alertText"></p>
+      </div>
+      <div id="content">
+        <div style="text-align:center;padding:60px;color:var(--muted)">
+          <div style="font-size:48px;margin-bottom:16px">🔍</div>
+          <p>დააჭირეთ "დაწყება" ტრეკინგის დასაწყებად</p>
+        </div>
+      </div>
+      <div id="historySection" style="margin-top:28px;display:none">
+        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">📋 ბოლო შემოწმებები</div>
+        <div class="history-items" id="historyList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TELEGRAM TAB -->
+  <div class="tab-content" id="tab-telegram">
+    <div class="tg-steps">
+      <div class="tg-step">
+        <div class="step-num" id="step1-num">1</div>
+        <div>
+          <h4>Telegram-ის ბოტი გახსენი</h4>
+          <p>ჩვენი ბოტი გამოგიგზავნის ალერტებს გამოცდის ადგილების შესახებ.</p>
+          <a href="https://t.me/Gamocda_tracker_bot" target="_blank" class="deep-link-btn">✈️ გახსენი @Gamocda_tracker_bot</a>
+        </div>
+      </div>
+
+      <div class="tg-step">
+        <div class="step-num" id="step2-num">2</div>
+        <div style="width:100%">
+          <h4>ანგარიშის დაკავშირება</h4>
+          <p>გენერირე კოდი, შემდეგ Telegram-ში ბოტს გაუგზავნე.</p>
+          <div id="tg-code-section">
+            <button class="btn btn-blue btn-sm" style="width:auto;margin-top:12px" onclick="generateTgLink()">🔗 კოდის გენერირება</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tg-step">
+        <div class="step-num" id="step3-num">3</div>
+        <div style="width:100%">
+          <h4>შეტყობინებების პარამეტრები</h4>
+          <p>მიუთითე რომელ კატეგორიებს ადევნო თვალი</p>
+          <div style="margin-top:16px">
+            <div class="notif-toggle">
+              <span style="font-size:14px">შეტყობინებები</span>
+              <div class="toggle" id="notifToggle" onclick="toggleNotif()"></div>
+            </div>
+            <div style="margin-top:14px;font-size:13px;color:var(--muted);margin-bottom:10px">კატეგორიები:</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px" id="catCheckboxes"></div>
+            <button class="btn btn-green btn-sm" style="width:auto;margin-top:16px" onclick="saveNotifPrefs()">💾 შენახვა</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tg-linked-banner" style="display:none;background:rgba(0,204,102,.1);border:1px solid rgba(0,204,102,.3);border-radius:12px;padding:18px;max-width:520px;margin-top:16px">
+      ✅ <strong>Telegram დაკავშირებულია!</strong> — ალერტებს მიიღებთ გამოცდის ადგილების გამოჩენისას.
+    </div>
+  </div>
+
+  <!-- ACCOUNT TAB -->
+  <div class="tab-content" id="tab-account">
+    <div class="account-grid">
+      <div class="info-card">
+        <h3>👤 პირადი ინფო</h3>
+        <div class="info-row"><span>სახელი</span><span class="value" id="acc-name">—</span></div>
+        <div class="info-row"><span>პირადი ნომერი</span><span class="value" id="acc-pid">—</span></div>
+        <div class="info-row"><span>ტელეფონი</span><span class="value" id="acc-phone">—</span></div>
+        <div class="info-row"><span>Telegram</span><span class="value" id="acc-tg">—</span></div>
+      </div>
+
+      <div class="info-card">
+        <h3>💳 გამოწერა</h3>
+        <div class="info-row"><span>სტატუსი</span><span class="value" id="acc-sub-status">—</span></div>
+        <div class="info-row"><span>ვადა</span><span class="value" id="acc-sub-expiry">—</span></div>
+        <div style="margin-top:16px" id="acc-pay-btn-wrap"></div>
+      </div>
+
+      <div class="sub-price-box" id="sub-promo" style="display:none">
+        <div class="sub-price">10 <span>₾/თვე</span></div>
+        <div class="sub-features">
+          <div class="sub-feature">ყველა სასწავლო ცენტრი</div>
+          <div class="sub-feature">ავტომატური შემოწმება ყოველ 60 წამში</div>
+          <div class="sub-feature">Telegram ალერტები დაუყოვნებლივ</div>
+          <div class="sub-feature">ყველა კატეგორია (B, C, D, A)</div>
+        </div>
+        <button class="btn btn-green" onclick="showPaymentModal()">💳 გამოიწერე ახლავე</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAYMENT MODAL -->
+<div class="modal-overlay" id="payModal">
+  <div class="modal">
+    <h2>💳 გამოწერის შეძენა</h2>
+    <p>1 თვის გამოწერა — <strong style="color:var(--red)">10 ლარი</strong></p>
+    <div id="pay-loading" style="text-align:center;padding:20px">
+      <div class="spinner" style="margin:0 auto 12px"></div>
+      <p style="color:var(--muted)">გადახდა მომზადდება...</p>
+    </div>
+    <div id="pay-manual" style="display:none">
+      <div class="manual-pay-box" id="manualPayInfo"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closePayModal()">დახურვა</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let TOKEN = localStorage.getItem('exam_token');
+let currentUser = null;
+let trackInterval = null;
+let countdownInterval = null;
+let nextCheck = 0;
+const CHECK_SEC = 60;
+const checkHistory = [];
+let notifEnabled = false;
+let watchedCats = [];
+
+const CATEGORIES = [
+  {value:'4',label:'B ავტომატი'},{value:'1',label:'B მექანიკა'},
+  {value:'3',label:'C კატეგ.'},{value:'6',label:'D კატეგ.'},{value:'7',label:'A კატეგ.'}
+];
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function switchTab(name,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+// ── Auth ──
+async function doLogin(){
+  const pid=document.getElementById('login-pid').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  const err=document.getElementById('login-error');
+  err.style.display='none';
+  if(!pid||!pass){showErr(err,'შეავსეთ ყველა ველი');return;}
+  const btn=document.getElementById('login-btn');
+  btn.disabled=true;btn.textContent='შესვლა...';
+  try{
+    const res=await api('/api/auth/login','POST',{personalId:pid,password:pass});
+    TOKEN=res.token;localStorage.setItem('exam_token',TOKEN);
+    currentUser=res.user;initApp();
+  }catch(e){showErr(err,e.message);btn.disabled=false;btn.textContent='შესვლა';}
+}
+
+async function doRegister(){
+  const pid=document.getElementById('reg-pid').value.trim();
+  const name=document.getElementById('reg-name').value.trim();
+  const phone=document.getElementById('reg-phone').value.trim();
+  const pass=document.getElementById('reg-pass').value;
+  const pass2=document.getElementById('reg-pass2').value;
+  const err=document.getElementById('reg-error');
+  err.style.display='none';
+  if(pass!==pass2){showErr(err,'პაროლები არ ემთხვევა');return;}
+  const btn=document.getElementById('reg-btn');
+  btn.disabled=true;btn.textContent='რეგისტრაცია...';
+  try{
+    const res=await api('/api/auth/register','POST',{personalId:pid,fullName:name,phone,password:pass});
+    TOKEN=res.token;localStorage.setItem('exam_token',TOKEN);
+    currentUser=res.user;initApp();
+  }catch(e){showErr(err,e.message);btn.disabled=false;btn.textContent='რეგისტრაცია';}
+}
+
+async function doLogout(){
+  try{await api('/api/auth/logout','POST');}catch{}
+  localStorage.removeItem('exam_token');TOKEN=null;currentUser=null;
+  stopTracking();showPage('login-page');
+}
+
+// ── App init ──
+async function initApp(){
+  showPage('app-page');
+  try{currentUser=await api('/api/auth/me');}catch{doLogout();return;}
+
+  document.getElementById('header-user').textContent=currentUser.fullName;
+  document.getElementById('sub-badge').textContent=currentUser.subscriptionActive?'✅ გამოწერა აქტიურია':'⚠️ გამოწერა არ არის';
+
+  if(currentUser.subscriptionActive){
+    document.getElementById('tracker-ui').style.display='block';
+    document.getElementById('sub-required').style.display='none';
+  }else{
+    document.getElementById('tracker-ui').style.display='none';
+    document.getElementById('sub-required').style.display='block';
+  }
+
+  document.getElementById('acc-name').textContent=currentUser.fullName;
+  document.getElementById('acc-pid').textContent=currentUser.personalId;
+  document.getElementById('acc-phone').textContent=currentUser.phone||'—';
+  document.getElementById('acc-tg').textContent=currentUser.telegramLinked?'✅ დაკავშირებულია':'❌ არ არის';
+
+  if(currentUser.subscriptionActive){
+    document.getElementById('acc-sub-status').innerHTML='<span class="badge-active">✅ აქტიური</span>';
+    const exp=currentUser.subscriptionExpiry?new Date(currentUser.subscriptionExpiry).toLocaleDateString('ka-GE'):'—';
+    document.getElementById('acc-sub-expiry').textContent=exp;
+    document.getElementById('acc-pay-btn-wrap').innerHTML='';
+    document.getElementById('sub-promo').style.display='none';
+  }else{
+    document.getElementById('acc-sub-status').innerHTML='<span class="badge-inactive">❌ არ არის</span>';
+    document.getElementById('acc-sub-expiry').textContent='—';
+    document.getElementById('acc-pay-btn-wrap').innerHTML='<button class="btn" onclick="showPaymentModal()">💳 გამოიწერე — 10 ₾</button>';
+    document.getElementById('sub-promo').style.display='block';
+  }
+
+  if(currentUser.telegramLinked){
+    document.getElementById('tg-linked-banner').style.display='block';
+    ['step1-num','step2-num'].forEach(id=>{
+      const el=document.getElementById(id);
+      el.className='step-num done';el.textContent='✓';
+    });
+  }
+
+  notifEnabled=currentUser.notificationsEnabled;
+  watchedCats=currentUser.watchedCategories||[];
+  renderNotifToggle();renderCatCheckboxes();
+
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('payment')==='success'){
+    setTimeout(()=>{alert('✅ გადახდა წარმატებული! გამოწერა გააქტიურდება მალე.');},500);
+    window.history.replaceState({},'','/');
+  }
+}
+
+// ── Tracker ──
+function setStatus(type,text){
+  document.getElementById('statusDot').className='status-dot '+type;
+  document.getElementById('statusText').textContent=text;
+}
+
+async function checkSlots(){
+  const cat=document.getElementById('categorySelect').value;
+  setStatus('active','შემოწმება...');
+  try{
+    const data=await api('/api/all-slots?categoryCode='+cat);
+    renderCenters(data);
+    addHistory(data.hasSlots,data.totalAvailable);
+    document.getElementById('lastCheck').textContent='ბოლო: '+new Date().toLocaleTimeString('ka-GE');
+    setStatus('active','აქტიურია');
+    nextCheck=CHECK_SEC;
+  }catch(e){
+    if(e.code==='SUBSCRIPTION_REQUIRED'){stopTracking();currentUser.subscriptionActive=false;initApp();}
+    else setStatus('error','შეცდომა...');
+  }
+}
+
+function renderCenters(data){
+  const el=document.getElementById('content');
+  if(!data.centers?.length){el.innerHTML='<div class="loading"><p>მონაცემები ვერ მოიძებნა</p></div>';return;}
+  el.innerHTML=`<div class="centers-grid">${data.centers.map(c=>{
+    const has=c.availableDates.length>0;
+    return`<div class="center-card ${has?'has-slots':''}">
+      <div class="center-header">
+        <span class="center-name">📍 ${c.center}</span>
+        <span class="slot-count ${has?'available':'empty'}">${has?c.availableDates.length+' ადგილი':'დაკავებულია'}</span>
+      </div>
+      <div class="dates-list">
+        ${has?c.availableDates.map(d=>`<span class="date-tag">📅 ${d.bookingDate||d.examDate||d.date||JSON.stringify(d)}</span>`).join('')
+             :'<span class="empty-msg">ყველა თარიღი დაკავებულია</span>'}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+  const banner=document.getElementById('alertBanner');
+  if(data.hasSlots){
+    banner.classList.add('show');
+    document.getElementById('alertText').textContent=`სულ ${data.totalAvailable} ადგილი! გადადით my.sa.gov.ge-ზე.`;
+    try{const ctx=new AudioContext();const o=ctx.createOscillator();o.connect(ctx.destination);o.frequency.value=880;o.start();o.stop(ctx.currentTime+.3);}catch{}
+  }else banner.classList.remove('show');
+}
+
+function addHistory(found,count){
+  checkHistory.unshift({time:new Date().toLocaleTimeString('ka-GE'),found,count});
+  if(checkHistory.length>10)checkHistory.pop();
+  document.getElementById('historySection').style.display='block';
+  document.getElementById('historyList').innerHTML=checkHistory.map(h=>
+    `<div class="history-item ${h.found?'found':''}">${h.time} — ${h.found?`✅ ${h.count} ადგილი!`:'❌ ადგილი არ არის'}</div>`
+  ).join('');
+}
+
+async function startTracking(){
+  document.getElementById('startBtn').disabled=true;
+  document.getElementById('stopBtn').disabled=false;
+  document.getElementById('categorySelect').disabled=true;
+  document.getElementById('content').innerHTML='<div class="loading"><div class="spinner"></div><p>პირველი შემოწმება...</p></div>';
+  await checkSlots();
+  trackInterval=setInterval(checkSlots,CHECK_SEC*1000);
+  nextCheck=CHECK_SEC;
+  countdownInterval=setInterval(()=>{
+    nextCheck--;
+    document.getElementById('countdown').textContent=nextCheck>0?`შემდეგი: ${nextCheck}წმ`:'შემოწმება...';
+    if(nextCheck<=0)nextCheck=CHECK_SEC;
+  },1000);
+}
+
+function stopTracking(){
+  clearInterval(trackInterval);clearInterval(countdownInterval);
+  trackInterval=null;
+  const s=document.getElementById('startBtn');const t=document.getElementById('stopBtn');
+  const c=document.getElementById('categorySelect');const d=document.getElementById('countdown');
+  if(s)s.disabled=false;if(t)t.disabled=true;if(c)c.disabled=false;if(d)d.textContent='';
+  setStatus('','გაჩერებულია');
+}
+
+// ── Telegram ──
+async function generateTgLink(){
+  const section=document.getElementById('tg-code-section');
+  section.innerHTML='<div class="spinner" style="margin:12px auto;width:24px;height:24px;border-width:2px"></div>';
+  try{
+    const res=await api('/api/telegram/generate-link','POST');
+    section.innerHTML=`
+      <div class="tg-code-box">კოდი: <strong>${res.code}</strong></div>
+      <a href="${res.deepLink}" target="_blank" class="deep-link-btn">✈️ ბოტის გახსნა და კოდის გაგზავნა</a>
+      <p style="color:var(--muted);font-size:12px;margin-top:8px">ბოტს გაუგზავნე: <code>/start ${res.code}</code> — კოდი 10 წუთში ამოიწურება.</p>
+      <button class="btn btn-green btn-sm" style="width:auto;margin-top:10px" onclick="checkTgLinked()">🔄 შევამოწმო</button>`;
+  }catch(e){section.innerHTML=`<p style="color:var(--red);font-size:13px;margin-top:10px">${e.message}</p>`;}
+}
+
+async function checkTgLinked(){
+  try{
+    currentUser=await api('/api/auth/me');
+    if(currentUser.telegramLinked){
+      document.getElementById('tg-linked-banner').style.display='block';
+      ['step1-num','step2-num'].forEach(id=>{const el=document.getElementById(id);el.className='step-num done';el.textContent='✓';});
+      document.getElementById('acc-tg').textContent='✅ დაკავშირებულია';
+      document.getElementById('tg-code-section').innerHTML='<p style="color:var(--green);font-size:13px;margin-top:10px">✅ Telegram წარმატებით დაკავშირდა!</p>';
+    }else alert('ჯერ არ არის დაკავშირებული. ბოტს გაუგზავნე კოდი!');
+  }catch{}
+}
+
+function renderNotifToggle(){
+  const t=document.getElementById('notifToggle');
+  if(t)t.className='toggle'+(notifEnabled?' on':'');
+}
+
+function toggleNotif(){notifEnabled=!notifEnabled;renderNotifToggle();}
+
+function renderCatCheckboxes(){
+  const el=document.getElementById('catCheckboxes');
+  if(!el)return;
+  el.innerHTML=CATEGORIES.map(c=>`
+    <label style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:13px;background:var(--card2);border:1px solid var(--border);padding:7px 14px;border-radius:20px">
+      <input type="checkbox" value="${c.value}" ${watchedCats.length===0||watchedCats.includes(c.value)?'checked':''} onchange="updateCatSel()">
+      ${c.label}
+    </label>`).join('');
+}
+
+function updateCatSel(){watchedCats=Array.from(document.querySelectorAll('#catCheckboxes input:checked')).map(i=>i.value);}
+
+async function saveNotifPrefs(){
+  updateCatSel();
+  try{await api('/api/telegram/preferences','POST',{enabled:notifEnabled,categories:watchedCats});alert('✅ პარამეტრები შენახულია!');}
+  catch(e){alert('შეცდომა: '+e.message);}
+}
+
+// ── Payment ──
+async function showPaymentModal(){
+  document.getElementById('payModal').classList.add('show');
+  document.getElementById('pay-loading').style.display='block';
+  document.getElementById('pay-manual').style.display='none';
+  try{
+    const res=await api('/api/payment/create','POST');
+    document.getElementById('pay-loading').style.display='none';
+    if(res.redirectUrl){window.location.href=res.redirectUrl;}
+    else if(res.demoMode){
+      document.getElementById('pay-manual').style.display='block';
+      const i=res.manualPaymentInfo;
+      document.getElementById('manualPayInfo').innerHTML=`
+        <div><strong>🏦 გადარიცხეთ:</strong></div>
+        <div>ანგარიში: <strong>${i.bankAccount}</strong></div>
+        <div>თანხა: <strong style="color:var(--green)">${i.amount}</strong></div>
+        <div>დანიშნულება: <strong style="color:var(--yellow)">${i.reference}</strong></div>
+        <div style="margin-top:8px;color:var(--muted);font-size:12px">${i.note}</div>`;
+    }
+  }catch(e){
+    document.getElementById('pay-loading').style.display='none';
+    document.getElementById('pay-manual').style.display='block';
+    document.getElementById('manualPayInfo').innerHTML=`<p style="color:var(--red)">${e.message}</p>`;
+  }
+}
+
+function closePayModal(){document.getElementById('payModal').classList.remove('show');}
+
+// ── API ──
+async function api(url,method='GET',body=null){
+  const opts={method,headers:{'Content-Type':'application/json'}};
+  if(TOKEN)opts.headers['Authorization']='Bearer '+TOKEN;
+  if(body)opts.body=JSON.stringify(body);
+  const res=await fetch(url,opts);
+  const data=await res.json();
+  if(!res.ok){const e=new Error(data.error||'შეცდომა');e.code=data.code;throw e;}
+  return data;
+}
+
+function showErr(el,msg){el.textContent=msg;el.style.display='block';}
+
+// ── Boot ──
+if(TOKEN)initApp();else showPage('login-page');
+
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  if(document.getElementById('login-page').classList.contains('active'))doLogin();
+  else if(document.getElementById('register-page').classList.contains('active'))doRegister();
+});
+</script>
+</body>
+</html>
