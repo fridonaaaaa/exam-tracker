@@ -802,21 +802,58 @@ async function checkSlots() {
   const cat = document.getElementById('categorySelect').value;
   setStatus('active', 'შემოწმება...');
   try {
-    const data = await api('/api/all-slots?categoryCode=' + cat);
+    const BASE = 'https://api-bookings.sa.gov.ge/api/v1/DrivingLicensePracticalExams2';
+    const HEADERS = { 'Origin': 'https://my.sa.gov.ge', 'Referer': 'https://my.sa.gov.ge/', 'Accept': 'application/json' };
+
+    const centersRes = await fetch(`${BASE}/DrivingLicenseExamsCenters2?CategoryCode=${cat}`, { headers: HEADERS });
+    const centers = await centersRes.json();
+
+    const results = await Promise.all(centers.map(async (center) => {
+      const centerId = center.serviceCenterId || center.id;
+      const centerName = center.serviceCenterName || center.name;
+      try {
+        const datesRes = await fetch(`${BASE}/DrivingLicenseExamsDates2?CategoryCode=${cat}&CenterId=${centerId}`, { headers: HEADERS });
+        const dates = await datesRes.json();
+        return { center: centerName, centerId, availableDates: Array.isArray(dates) ? dates : [] };
+      } catch {
+        return { center: centerName, centerId, availableDates: [] };
+      }
+    }));
+
+    const available = results.filter(r => r.availableDates.length > 0);
+    const data = {
+      timestamp: new Date().toISOString(),
+      totalAvailable: available.reduce((sum, r) => sum + r.availableDates.length, 0),
+      centers: results,
+      hasSlots: available.length > 0,
+    };
+
     renderCenters(data);
     addHistory(data.hasSlots, data.totalAvailable);
     document.getElementById('lastCheck').textContent = 'ბოლო: ' + new Date().toLocaleTimeString('ka-GE');
     setStatus('active', 'აქტიურია');
     nextCheck = CHECK_SEC;
 
-    // Total slots badge
     const badge = document.getElementById('totalSlotsBadge');
     if (data.hasSlots) {
       badge.textContent = `სულ ადგილი: ${data.totalAvailable}`;
       badge.style.display = 'block';
+      playBeep();
+      if (Notification.permission === 'granted') {
+        new Notification('🚗 გამოცდის ადგილი!', { body: `სულ ${data.totalAvailable} ადგილი ხელმისაწვდომია!` });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(p => {
+          if (p === 'granted') new Notification('🚗 გამოცდის ადგილი!', { body: `სულ ${data.totalAvailable} ადგილი ხელმისაწვდომია!` });
+        });
+      }
     } else {
       badge.style.display = 'none';
     }
+  } catch(e) {
+    if (e.code === 'SUBSCRIPTION_REQUIRED') { stopTracking(); currentUser.subscriptionActive = false; initApp(); }
+    else setStatus('error', 'შეცდომა: ' + e.message);
+  }
+}
 
     // Browser push notification when slots found
     if (data.hasSlots) {
