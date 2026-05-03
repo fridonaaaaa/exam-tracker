@@ -802,28 +802,7 @@ async function checkSlots() {
   const cat = document.getElementById('categorySelect').value;
   setStatus('active', 'შემოწმება...');
   try {
-    const BASE = 'https://api-bookings.sa.gov.ge/api/v1/DrivingLicensePracticalExams2';
-    const HEADERS = { 'Origin': 'https://my.sa.gov.ge', 'Referer': 'https://my.sa.gov.ge/', 'Accept': 'application/json' };
-    const centersRes = await fetch(`${BASE}/DrivingLicenseExamsCenters2?CategoryCode=${cat}`, { headers: HEADERS });
-    const centers = await centersRes.json();
-    const results = await Promise.all(centers.map(async (center) => {
-      const centerId = center.serviceCenterId || center.id;
-      const centerName = center.serviceCenterName || center.name;
-      try {
-        const datesRes = await fetch(`${BASE}/DrivingLicenseExamsDates2?CategoryCode=${cat}&CenterId=${centerId}`, { headers: HEADERS });
-        const dates = await datesRes.json();
-        return { center: centerName, centerId, availableDates: Array.isArray(dates) ? dates : [] };
-      } catch {
-        return { center: centerName, centerId, availableDates: [] };
-      }
-    }));
-    const available = results.filter(r => r.availableDates.length > 0);
-    const data = {
-      timestamp: new Date().toISOString(),
-      totalAvailable: available.reduce((sum, r) => sum + r.availableDates.length, 0),
-      centers: results,
-      hasSlots: available.length > 0,
-    };
+    const data = await api('/api/all-slots?categoryCode=' + cat);
     renderCenters(data);
     addHistory(data.hasSlots, data.totalAvailable);
     document.getElementById('lastCheck').textContent = 'ბოლო: ' + new Date().toLocaleTimeString('ka-GE');
