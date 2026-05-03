@@ -348,47 +348,37 @@ app.get('/api/centers', requireAuth, requireSubscription, async (req, res) => {
   }
 });
 
-/** Fetch all available exam slots across all centers for a category. */
+const PROXY_URL = 'https://rope-regulator-prudishly.ngrok-free.dev';
+
 app.get('/api/all-slots', requireAuth, requireSubscription, async (req, res) => {
   try {
     const categoryCode = req.query.categoryCode || 4;
-    const centersRes = await fetch(
-      `${BASE_URL}/DrivingLicenseExamsCenters2?CategoryCode=${categoryCode}`,
-      { headers: EXAM_HEADERS }
-    );
-    const centers = await centersRes.json();
+    const response = await fetch(`${PROXY_URL}/api/all-slots?categoryCode=${categoryCode}`);
+    const data = await response.json();
 
-    if (!Array.isArray(centers)) {
-      return res.json({ error: 'გარე სერვისი მიუწვდომელია', centers: [], hasSlots: false, totalAvailable: 0 });
+    if (data.hasSlots) {
+      const available = data.centers.filter(r => r.availableDates.length > 0);
+      for (const [pid, user] of db.users) {
+        if (
+          user.subscriptionActive &&
+          user.telegramLinked &&
+          user.notificationsEnabled &&
+          user.telegramChatId &&
+          (user.watchedCategories.includes(categoryCode.toString()) || user.watchedCategories.length === 0)
+        ) {
+          const lines = available.map(c =>
+            `📍 <b>${c.center}</b>: ${c.availableDates.length} ადგილი`
+          ).join('\n');
+          await sendTelegram(user.telegramChatId,
+            `🚨 <b>გამოცდის ადგილი გამოჩნდა!</b>\n\n${lines}\n\n🔗 დაჯავშნეთ: https://my.sa.gov.ge`
+          );
+        }
+      }
     }
 
-    const results = await Promise.all(
-      centers.map(async (center) => {
-        const centerId = center.serviceCenterId || center.id;
-        const centerName = center.serviceCenterName || center.name;
-        try {
-          const datesRes = await fetch(
-            `${BASE_URL}/DrivingLicenseExamsDates2?CategoryCode=${categoryCode}&CenterId=${centerId}`,
-            { headers: EXAM_HEADERS }
-          );
-          const dates = await datesRes.json();
-          return { center: centerName, centerId, availableDates: Array.isArray(dates) ? dates : [] };
-        } catch {
-          return { center: centerName, centerId, availableDates: [] };
-        }
-      })
-    );
-
-    const available = results.filter(r => r.availableDates.length > 0);
-    res.json({
-      timestamp: new Date().toISOString(),
-      totalAvailable: available.reduce((sum, r) => sum + r.availableDates.length, 0),
-      centers: results,
-      hasSlots: available.length > 0,
-    });
+    res.json(data);
   } catch (err) {
-    console.error('All-slots fetch error:', err.message);
-    res.json({ error: 'გარე სერვისი მიუწვდომელია', centers: [], hasSlots: false, totalAvailable: 0 });
+    res.status(500).json({ error: 'გარე სერვისი მიუწვდომელია', centers: [], hasSlots: false, totalAvailable: 0 });
   }
 });
 
