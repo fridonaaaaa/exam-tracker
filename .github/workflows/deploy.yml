@@ -44,3 +44,4 @@ jobs:
               -p 3000:3000 \
               -e MONGO_URI="${{ secrets.MONGO_URI }}" \
               ${{ secrets.DOCKER_USERNAME }}/myapp:latest
+            sudo systemctl restart nginx
