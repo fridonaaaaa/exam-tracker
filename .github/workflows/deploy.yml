@@ -41,6 +41,6 @@ jobs:
             docker run -d \
               --name myapp \
               --restart always \
-              -p 80:3000 \
+              -p 3000:3000 \
               -e MONGO_URI="${{ secrets.MONGO_URI }}" \
               ${{ secrets.DOCKER_USERNAME }}/myapp:latest
