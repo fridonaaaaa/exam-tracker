@@ -2158,8 +2158,9 @@ async function doAdminSecretLogin() {
     const data = await api('/api/auth/login', 'POST', { personalId: pid, password: pw });
     if (!data.token) { errEl.textContent = data.error || 'შეცდომა'; btn.disabled = false; btn.textContent = 'შესვლა'; return; }
     if (!data.user?.isAdmin) { errEl.textContent = 'ეს არ არის ადმინის ანგარიში'; btn.disabled = false; btn.textContent = 'შესვლა'; return; }
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
+    TOKEN = data.token;
+    localStorage.setItem('exam_token', TOKEN);
+    currentUser = data.user;
     closeAdminSecretModal();
     await initApp();
   } catch(e) {
