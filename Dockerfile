@@ -2,15 +2,22 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies
+# Install backend dependencies
 COPY package*.json ./
 RUN npm install --production
 
-# Copy the rest of your code
+# Copy the rest of your backend code
 COPY . .
 
-# Expose the port your server.js listens on
+# Build the frontend
+WORKDIR /app/my-project
+COPY my-project/package*.json ./
+RUN npm install
+RUN npm run build
+
+# Go back to app root
+WORKDIR /app
+
 EXPOSE 3000
 
-# Start the app
 CMD ["node", "server.js"]
