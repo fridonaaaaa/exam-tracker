@@ -39,4 +39,5 @@ jobs:
               -p 3000:3000 \
               --env MONGO_URI \
               ${{ secrets.DOCKER_USERNAME }}/myapp:latest
-            sudo systemctl restart nginx
+            sudo docker cp myapp:/app/public/index.html /var/www/html/index.html
+            sudo systemctl reload nginx
