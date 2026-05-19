@@ -1095,16 +1095,35 @@
 
     <!-- SLOTS TAB -->
     <div class="admin-panel" id="atab-slots">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div style="font-size:14px;font-weight:700">🔔 სლოტ-მოვლენების ჟურნალი</div>
-        <div style="display:flex;gap:10px">
-          <select id="ev-filter" style="width:auto;padding:8px 14px;font-size:13px" onchange="filterEvents()">
-            <option value="">ყველა</option>
-            <option value="opened">გახსნილი</option>
-            <option value="booked">დაჯავშნული</option>
-          </select>
-          <button class="btn btn-ghost btn-sm" onclick="loadSlotEvents()">🔄 განახლება</button>
-        </div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:16px">🔔 სლოტ-მოვლენების ჟურნალი</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:center">
+        <select id="ev-filter-cat" style="width:auto;padding:8px 14px;font-size:13px" onchange="filterEvents()">
+          <option value="">ყველა კატეგორია</option>
+          <option value="4">B — ავტომატი</option>
+          <option value="1">B — მექანიკა</option>
+          <option value="3">C კატეგორია</option>
+          <option value="6">D კატეგორია</option>
+          <option value="7">A კატეგორია</option>
+        </select>
+        <select id="ev-filter-city" style="width:auto;padding:8px 14px;font-size:13px" onchange="filterEvents()">
+          <option value="">ყველა ქალაქი</option>
+          <option value="ქუთაის">ქუთაისი</option>
+          <option value="ბათუმ">ბათუმი</option>
+          <option value="რუსთავ">რუსთავი</option>
+          <option value="გორ">გორი</option>
+          <option value="ზუგდიდ">ზუგდიდი</option>
+          <option value="ფოთ">ფოთი</option>
+          <option value="თელავ">თელავი</option>
+          <option value="ახალციხ">ახალციხე</option>
+          <option value="ოზურგეთ">ოზურგეთი</option>
+        </select>
+        <select id="ev-filter" style="width:auto;padding:8px 14px;font-size:13px" onchange="filterEvents()">
+          <option value="">გახსნილი / დაჯავშნული</option>
+          <option value="opened">გახსნილი</option>
+          <option value="booked">დაჯავშნული</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadSlotEvents()">🔄 განახლება</button>
+        <span id="ev-count" style="font-size:12px;color:var(--text-muted);margin-left:auto"></span>
       </div>
       <div id="events-wrap">
         <div class="state-box"><div class="spinner-lg"></div></div>
@@ -2076,8 +2095,17 @@ async function loadSlotEvents() {
 }
 
 function filterEvents() {
-  const filter = (document.getElementById('ev-filter') || {}).value || '';
-  const events = filter ? allSlotEvents.filter(e => e.type === filter) : allSlotEvents;
+  const type = (document.getElementById('ev-filter') || {}).value || '';
+  const cat  = (document.getElementById('ev-filter-cat') || {}).value || '';
+  const city = (document.getElementById('ev-filter-city') || {}).value || '';
+  const events = allSlotEvents.filter(e => {
+    if (type && e.type !== type) return false;
+    if (cat  && String(e.categoryCode) !== cat) return false;
+    if (city && !(e.center || '').includes(city)) return false;
+    return true;
+  });
+  const countEl = document.getElementById('ev-count');
+  if (countEl) countEl.textContent = events.length + ' ჩანაწერი';
   renderEventsInDiv('events-wrap', events);
 }
 
