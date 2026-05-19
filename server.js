@@ -28,7 +28,10 @@ const CONFIG = {
 let db;
 
 async function connectDB() {
-  const client = new MongoClient(CONFIG.MONGO_URI);
+  const client = new MongoClient(CONFIG.MONGO_URI, {
+    tls: true,
+    tlsAllowInvalidCertificates: true,
+  });
   await client.connect();
   db = client.db('examtracker');
 
