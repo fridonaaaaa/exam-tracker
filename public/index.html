@@ -771,7 +771,7 @@
   <div class="auth-bg">
     <div class="auth-container">
       <div class="auth-logo">
-        <div class="auth-logo-icon">🚗</div>
+        <div class="auth-logo-icon" id="login-logo-icon" style="cursor:pointer;user-select:none">🚗</div>
         <h1>გამოცდის ტრეკერი</h1>
         <p>პრაქტიკული გამოცდის ადგილების ავტომატური მაძიებელი</p>
       </div>
@@ -931,7 +931,6 @@
         <div class="form-group">
           <label class="form-label">🏙️ ქალაქი</label>
           <select id="setup-city">
-            <option value="თბილის">თბილისი</option>
             <option value="ქუთაის">ქუთაისი</option>
             <option value="ბათუმ">ბათუმი</option>
             <option value="რუსთავ">რუსთავი</option>
@@ -1196,7 +1195,6 @@
       <div class="form-group">
         <label class="form-label">🏙️ ქალაქი</label>
         <select id="modal-city">
-          <option value="თბილის">თბილისი</option>
           <option value="ქუთაის">ქუთაისი</option>
           <option value="ბათუმ">ბათუმი</option>
           <option value="რუსთავ">რუსთავი</option>
@@ -1272,7 +1270,6 @@
     <div class="form-group">
       <label class="form-label">🏙️ ქალაქი</label>
       <select id="edit-city">
-        <option value="თბილის">თბილისი</option>
         <option value="ქუთაის">ქუთაისი</option>
         <option value="ბათუმ">ბათუმი</option>
         <option value="რუსთავ">რუსთავი</option>
@@ -1328,7 +1325,7 @@ let allSlotEvents = [];
 const CHECK_SEC = 60;
 
 const CITY_LABELS = {
-  'თბილის': 'თბილისი', 'ქუთაის': 'ქუთაისი', 'ბათუმ': 'ბათუმი',
+  'ქუთაის': 'ქუთაისი', 'ბათუმ': 'ბათუმი',
   'რუსთავ': 'რუსთავი', 'გორ': 'გორი', 'ზუგდიდ': 'ზუგდიდი',
   'ფოთ': 'ფოთი', 'თელავ': 'თელავი', 'ახალციხ': 'ახალციხე', 'ოზურგეთ': 'ოზურგეთი',
 };
@@ -1810,7 +1807,7 @@ function showEditPrefsModal() {
   const modal = document.getElementById('edit-prefs-modal');
 
   document.getElementById('edit-date').value = p.earliestDate || '';
-  document.getElementById('edit-city').value = p.city || 'თბილის';
+  document.getElementById('edit-city').value = p.city || 'ქუთაის';
 
   // Select current cat pill
   document.querySelectorAll('#edit-cats .cat-pill').forEach(btn => {
@@ -2116,10 +2113,71 @@ async function toolHealth() {
 }
 
 // ═══════════════════════════════════════════
+// SECRET ADMIN LOGIN (triple-tap logo)
+// ═══════════════════════════════════════════
+(function() {
+  let tapCount = 0, tapTimer = null;
+  const icon = document.getElementById('login-logo-icon');
+  if (!icon) return;
+  function handleTap() {
+    tapCount++;
+    clearTimeout(tapTimer);
+    if (tapCount >= 3) {
+      tapCount = 0;
+      document.getElementById('admin-secret-modal').style.display = 'flex';
+      document.getElementById('admin-secret-pid').value = '';
+      document.getElementById('admin-secret-pw').value = '';
+      document.getElementById('admin-secret-err').textContent = '';
+      document.getElementById('admin-secret-pid').focus();
+    } else {
+      tapTimer = setTimeout(() => { tapCount = 0; }, 800);
+    }
+  }
+  icon.addEventListener('click', handleTap);
+  icon.addEventListener('touchend', function(e) { e.preventDefault(); handleTap(); });
+})();
+
+function closeAdminSecretModal() {
+  document.getElementById('admin-secret-modal').style.display = 'none';
+}
+
+async function doAdminSecretLogin() {
+  const pid = document.getElementById('admin-secret-pid').value.trim();
+  const pw = document.getElementById('admin-secret-pw').value;
+  const errEl = document.getElementById('admin-secret-err');
+  errEl.textContent = '';
+  if (!pid || !pw) { errEl.textContent = 'შეავსეთ ყველა ველი'; return; }
+  const btn = document.getElementById('admin-secret-btn');
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const data = await api('/api/auth/login', 'POST', { personalId: pid, password: pw });
+    if (!data.token) { errEl.textContent = data.error || 'შეცდომა'; btn.disabled = false; btn.textContent = 'შესვლა'; return; }
+    if (!data.user?.isAdmin) { errEl.textContent = 'ეს არ არის ადმინის ანგარიში'; btn.disabled = false; btn.textContent = 'შესვლა'; return; }
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    closeAdminSecretModal();
+    await initApp();
+  } catch(e) {
+    errEl.textContent = e.message || 'სერვერის შეცდომა';
+    btn.disabled = false; btn.textContent = 'შესვლა';
+  }
+}
+
+document.getElementById('admin-secret-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeAdminSecretModal();
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeAdminSecretModal();
+  if (e.key === 'Enter' && document.getElementById('admin-secret-modal').style.display === 'flex') doAdminSecretLogin();
+});
+
+// ═══════════════════════════════════════════
 // KEYBOARD SHORTCUTS
 // ═══════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
+    if (document.getElementById('admin-secret-modal').style.display === 'flex') return;
     if (document.getElementById('page-login').classList.contains('active')) doLogin();
     else if (document.getElementById('page-register').classList.contains('active')) doRegister();
   }
@@ -2143,5 +2201,35 @@ document.getElementById('edit-prefs-modal').addEventListener('click', function(e
 if (TOKEN) initApp();
 else showPage('page-login');
 </script>
+
+<!-- SECRET ADMIN LOGIN MODAL -->
+<div id="admin-secret-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.75);align-items:center;justify-content:center;padding:24px">
+  <div style="background:#0e1127;border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:32px;width:100%;max-width:380px;box-shadow:0 8px 48px rgba(0,0,0,0.8)">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:36px;margin-bottom:8px">🔐</div>
+      <div style="font-weight:700;font-size:18px;color:#e2e8f0">ადმინის წვდომა</div>
+    </div>
+    <div id="admin-secret-err" style="color:#ef4444;font-size:13px;margin-bottom:12px;min-height:18px;text-align:center"></div>
+    <div style="margin-bottom:14px">
+      <label style="display:block;font-size:13px;color:#94a3b8;margin-bottom:6px">პირადი ნომერი</label>
+      <input id="admin-secret-pid" type="text" inputmode="numeric" maxlength="11" placeholder="11-ნიშნა პირადი ნომერი"
+        style="width:100%;padding:12px 14px;background:#151932;border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#e2e8f0;font-size:15px;outline:none"/>
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="display:block;font-size:13px;color:#94a3b8;margin-bottom:6px">პაროლი</label>
+      <input id="admin-secret-pw" type="password" placeholder="შეიყვანეთ პაროლი"
+        style="width:100%;padding:12px 14px;background:#151932;border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#e2e8f0;font-size:15px;outline:none"/>
+    </div>
+    <button id="admin-secret-btn" onclick="doAdminSecretLogin()"
+      style="width:100%;padding:13px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:600;cursor:pointer">
+      შესვლა
+    </button>
+    <button onclick="closeAdminSecretModal()"
+      style="width:100%;padding:10px;background:transparent;border:none;color:#94a3b8;font-size:14px;cursor:pointer;margin-top:8px">
+      გაუქმება
+    </button>
+  </div>
+</div>
+
 </body>
 </html>
