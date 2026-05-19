@@ -20,7 +20,7 @@ const CONFIG = {
   BOG_SHOP_ID: process.env.BOG_SHOP_ID || 'YOUR_SHOP_ID',
   APP_URL: process.env.APP_URL || 'http://localhost:3000',
   ADMIN_ID: process.env.ADMIN_PERSONAL_ID || '00000000000',
-  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'ADMIN',
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'admin1234',
   SUBSCRIPTION_PRICE: 10,
 };
 
@@ -181,7 +181,25 @@ app.get('/api/auth/me', requireAuth, (req, res) => {
     subscriptionActive: u.subscriptionActive,
     subscriptionExpiry: u.subscriptionExpiry,
     isAdmin: u.personalId === CONFIG.ADMIN_ID,
+    preferences: u.preferences || null,
   });
+});
+
+app.put('/api/user/preferences', requireAuth, async (req, res) => {
+  try {
+    const { earliestDate, city, category, categoryCode } = req.body;
+    if (!earliestDate || !city || !category) {
+      return res.status(400).json({ error: 'შეავსეთ ყველა ველი' });
+    }
+    await db.collection('users').updateOne(
+      { personalId: req.personalId },
+      { $set: { preferences: { earliestDate, city, category, categoryCode: categoryCode || '4' } } }
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Preferences error:', err.message);
+    res.status(500).json({ error: 'სერვერის შეცდომა' });
+  }
 });
 
 // ─── BOG Payment ──────────────────────────────────────────────────────────────
@@ -292,6 +310,20 @@ app.post('/api/admin/deactivate', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/admin/slot-events', requireAuth, async (req, res) => {
+  if (req.personalId !== CONFIG.ADMIN_ID) return res.status(403).json({ error: 'არ გაქვთ წვდომა' });
+  try {
+    const events = await db.collection('slotEvents')
+      .find({})
+      .sort({ timestamp: -1 })
+      .limit(200)
+      .toArray();
+    res.json(events);
+  } catch (err) {
+    res.status(500).json({ error: 'სერვერის შეცდომა' });
+  }
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 
 app.get('/api/health', async (req, res) => {
@@ -355,11 +387,43 @@ app.get('/api/centers', requireAuth, requireSubscription, async (req, res) => {
   }
 });
 
+// In-memory slot state for change detection (opened / booked)
+const slotStateCache = {}; // { [categoryCode]: { [center]: string[] } }
+
 app.get('/api/all-slots', requireAuth, requireSubscription, async (req, res) => {
   try {
-    const categoryCode = req.query.categoryCode || 4;
+    const categoryCode = (req.query.categoryCode || 4).toString();
     const response = await fetch(`${PROXY_URL}/api/all-slots?categoryCode=${categoryCode}`);
     const data = await response.json();
+
+    // Track slot events for admin dashboard
+    if (data.centers) {
+      const prev = slotStateCache[categoryCode] || {};
+      const curr = {};
+      const eventsToLog = [];
+
+      for (const c of data.centers) {
+        const dates = c.availableDates.map(d => d.bookingDate || d.examDate || d.date || JSON.stringify(d)).filter(Boolean);
+        curr[c.center] = dates;
+        const prevDates = prev[c.center] || [];
+        const prevSet = new Set(prevDates);
+        const currSet = new Set(dates);
+        for (const d of currSet) {
+          if (!prevSet.has(d)) eventsToLog.push({ type: 'opened', center: c.center, slotDate: d });
+        }
+        for (const d of prevSet) {
+          if (!currSet.has(d)) eventsToLog.push({ type: 'booked', center: c.center, slotDate: d });
+        }
+      }
+
+      slotStateCache[categoryCode] = curr;
+
+      if (eventsToLog.length > 0) {
+        await db.collection('slotEvents').insertMany(
+          eventsToLog.map(e => ({ ...e, categoryCode, timestamp: new Date() }))
+        );
+      }
+    }
 
     if (data.hasSlots) {
       const available = data.centers.filter(r => r.availableDates.length > 0);
@@ -372,7 +436,7 @@ app.get('/api/all-slots', requireAuth, requireSubscription, async (req, res) => 
 
       for (const user of users) {
         if (
-          user.watchedCategories?.includes(categoryCode.toString()) ||
+          user.watchedCategories?.includes(categoryCode) ||
           !user.watchedCategories?.length
         ) {
           const lines = available.map(c =>
