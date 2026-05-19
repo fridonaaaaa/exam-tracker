@@ -1441,6 +1441,11 @@ async function doLogin() {
   setBtn('login-btn', '<span class="spinner"></span>გთხოვთ დაიცადოთ...', true);
   try {
     const r = await api('/api/auth/login', 'POST', { personalId: pid, password: pw });
+    if (r.user?.isAdmin) {
+      err.textContent = 'მომხმარებელი ვერ მოიძებნა'; err.style.display = 'block';
+      setBtn('login-btn', 'შესვლა', false);
+      return;
+    }
     TOKEN = r.token;
     localStorage.setItem('exam_token', TOKEN);
     currentUser = r.user;
